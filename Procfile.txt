@@ -1,1 +1,1 @@
-worker: python rdv.py
+web: python rdv.py
