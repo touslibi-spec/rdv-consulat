@@ -1,6 +1,5 @@
 import time
 import requests
-import subprocess
 from datetime import datetime
 import re
 
@@ -21,13 +20,14 @@ def verifier():
         # Etape 1 : charger la page captcha
         r1 = session.get(URL, headers=HEADERS, timeout=15)
 
-        # Etape 2 : extraire le token et envoyer le formulaire
+        # Etape 2 : extraire le token
         token_match = re.search(r'name="token" value="([^"]+)"', r1.text)
         if not token_match:
             print("token introuvable")
             return False
         token = token_match.group(1)
 
+        # Etape 3 : envoyer le formulaire
         r2 = session.post(
             URL + "/",
             headers=HEADERS,
@@ -37,12 +37,11 @@ def verifier():
 
         texte = r2.text.lower()
 
-        # Si ce message apparait = pas de creneau
-        if "no hay horas disponibles" in texte:
-            return False
+        # Uniquement si "huecos libres" apparait = creneau confirme
+        if "huecos libres" in texte:
+            return True
 
-        # Si ce message n'apparait pas = creneau disponible !
-        return True
+        return False
 
     except Exception as e:
         print(f"Erreur : {e}")
@@ -72,15 +71,18 @@ print("Surveillance demarree - Consulat d Espagne a Oran")
 print(f"Verification toutes les {INTERVALLE // 60} minutes")
 print("Ctrl+C pour arreter\n")
 
+alerte_envoyee = False
 i = 1
 while True:
     heure = datetime.now().strftime("%H:%M:%S")
     print(f"[{i}] {heure} - Verification...", end=" ", flush=True)
     if verifier():
         print("CRENEAU TROUVE !")
-        alerter()
-        break
+        if not alerte_envoyee:
+            alerter()
+            alerte_envoyee = True
     else:
         print("Pas encore disponible.")
+        alerte_envoyee = False
     i += 1
     time.sleep(INTERVALLE)
