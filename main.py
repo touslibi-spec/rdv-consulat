@@ -2,8 +2,8 @@ import time
 import requests
 import subprocess
 from datetime import datetime
+import re
 
-# Configuration Telegram
 TELEGRAM_TOKEN   = "8644728406:AAGU0sLn2NLjl57yPtfR3D0-2Wz2FJ9O7m8"
 TELEGRAM_CHAT_ID = "6292977016"
 
@@ -16,12 +16,59 @@ HEADERS = {
 
 def verifier():
     try:
-        r = requests.get(URL, headers=HEADERS, timeout=15)
-        texte = r.text.lower()
-        if "seleccione" in texte or "fecha disponible" in texte or "hora" in texte:
-            return True
+        session = requests.Session()
+
+        # Etape 1 : charger la page captcha
+        r1 = session.get(URL, headers=HEADERS, timeout=15)
+
+        # Etape 2 : extraire le token
+        token_match = re.search(r'name="token" value="([^"]+)"', r1.text)
+        if not token_match:
+            print("token introuvable")
+            return False
+        token = token_match.group(1)
+
+        # Etape 3 : envoyer le formulaire captcha
+        r2 = session.post(
+            URL + "/",
+            headers=HEADERS,
+            data={"token": token},
+            timeout=15
+        )
+
+        texte = r2.text.lower()
+
+        # Mots qui indiquent pas de creneau
+        mots_negatifs = [
+            "no hay citas disponibles",
+            "no existen citas",
+            "sin citas",
+            "no disponible",
+            "no hay",
+        ]
+
+        for mot in mots_negatifs:
+            if mot in texte:
+                return False
+
+        # Mots qui indiquent un creneau disponible
+        mots_positifs = [
+            "seleccione",
+            "fecha",
+            "hora",
+            "disponible",
+            "calendario",
+            "elegir",
+        ]
+
+        for mot in mots_positifs:
+            if mot in texte:
+                return True
+
         return False
-    except:
+
+    except Exception as e:
+        print(f"Erreur : {e}")
         return False
 
 def envoyer_telegram(message):
@@ -37,15 +84,12 @@ def envoyer_telegram(message):
         print(f"Erreur Telegram : {e}")
 
 def alerter():
-    subprocess.run(["osascript", "-e",
-        'display notification "Un creneau est disponible ! Allez vite reserver !" with title "RENDEZ-VOUS DISPONIBLE !" sound name "Glass"'])
     envoyer_telegram(
         "RENDEZ-VOUS DISPONIBLE !\n\n"
         "Un creneau est disponible au Consulat d Espagne a Oran !\n\n"
         "Allez vite reserver :\n"
         "https://www.citaconsular.es/es/hosteds/widgetdefault/2da8fb6f4ac7361929959598a1e5b1e45"
     )
-    subprocess.run(["open", URL])
 
 print("Surveillance demarree - Consulat d Espagne a Oran")
 print(f"Verification toutes les {INTERVALLE // 60} minutes")
