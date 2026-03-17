@@ -21,14 +21,13 @@ def verifier():
         # Etape 1 : charger la page captcha
         r1 = session.get(URL, headers=HEADERS, timeout=15)
 
-        # Etape 2 : extraire le token
+        # Etape 2 : extraire le token et envoyer le formulaire
         token_match = re.search(r'name="token" value="([^"]+)"', r1.text)
         if not token_match:
             print("token introuvable")
             return False
         token = token_match.group(1)
 
-        # Etape 3 : envoyer le formulaire captcha
         r2 = session.post(
             URL + "/",
             headers=HEADERS,
@@ -38,34 +37,12 @@ def verifier():
 
         texte = r2.text.lower()
 
-        # Mots qui indiquent pas de creneau
-        mots_negatifs = [
-            "no hay citas disponibles",
-            "no existen citas",
-            "sin citas",
-            "no disponible",
-            "no hay",
-        ]
+        # Si ce message apparait = pas de creneau
+        if "no hay horas disponibles" in texte:
+            return False
 
-        for mot in mots_negatifs:
-            if mot in texte:
-                return False
-
-        # Mots qui indiquent un creneau disponible
-        mots_positifs = [
-            "seleccione",
-            "fecha",
-            "hora",
-            "disponible",
-            "calendario",
-            "elegir",
-        ]
-
-        for mot in mots_positifs:
-            if mot in texte:
-                return True
-
-        return False
+        # Si ce message n'apparait pas = creneau disponible !
+        return True
 
     except Exception as e:
         print(f"Erreur : {e}")
